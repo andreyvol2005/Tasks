@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/back">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginTop="70dp"
+        android:layout_marginBottom="50dp">
+
+        <!-- Заголовок и кнопка перехода -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/blur_background"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Список задач"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#000000" />
+
+            <Button
+                android:id="@+id/shoppingListButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="Покупки"
+                style="@style/RoundedButton" />
+
+        </RelativeLayout>
+
+        <!-- ListView для задач -->
+        <ListView
+            android:id="@+id/taskListView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="8dp"
+            android:padding="4dp" />
+
+        <!-- Область добавления новой задачи -->
+        <LinearLayout
+            android:id="@+id/addTaskLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/blur_background"
+            android:padding="12dp">
+
+            <EditText
+                android:id="@+id/taskInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Введите задачу"
+                android:imeOptions="actionDone"
+                android:inputType="text"
+                android:singleLine="true"
+                android:background="@android:color/white"
+                android:padding="12dp"
+                android:textColor="#000000"
+                android:textColorHint="#666666" />
+
+            <Button
+                android:id="@+id/addTaskButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Добавить"
+                style="@style/RoundedButton" />
+
+        </LinearLayout>
+
+        <!-- Кнопка добавления задачи -->
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Добавить задачу"
+            android:onClick="onAddTaskClick"
+            style="@style/RoundedButton"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+</LinearLayout>
