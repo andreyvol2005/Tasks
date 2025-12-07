@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mainLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/back">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:layout_marginTop="70dp"
+        android:layout_marginBottom="50dp">
+
+        <!-- Заголовок и кнопка возврата -->
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/blur_background"
+            android:padding="12dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Список покупок"
+                android:textSize="24sp"
+                android:textStyle="bold"
+                android:textColor="#000000"/>
+
+            <Button
+                android:id="@+id/backButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:text="Назад"
+                style="@style/RoundedButton" />
+
+        </RelativeLayout>
+
+        <!-- Кнопка сбросить всё -->
+        <Button
+            android:id="@+id/clearAllButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Сбросить всё"
+            style="@style/RoundedButton"
+            android:layout_marginBottom="16dp" />
+
+        <!-- ListView для покупок -->
+        <ListView
+            android:id="@+id/shoppingListView"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:divider="@android:color/transparent"
+            android:dividerHeight="8dp"
+            android:padding="4dp" />
+
+        <!-- Область добавления нового товара -->
+        <LinearLayout
+            android:id="@+id/addItemLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/blur_background"
+            android:padding="12dp">
+
+            <EditText
+                android:id="@+id/itemInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="Введите товар"
+                android:inputType="text"
+                android:imeOptions="actionDone"
+                android:singleLine="true"
+                android:background="@android:color/white"
+                android:padding="12dp"
+                android:textColor="#000000"
+                android:textColorHint="#666666" />
+
+            <Button
+                android:id="@+id/addItemButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Добавить"
+                style="@style/RoundedButton" />
+
+        </LinearLayout>
+
+        <!-- Кнопка добавления товара -->
+        <Button
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Добавить товар"
+            android:onClick="onAddItemClick"
+            style="@style/RoundedButton"
+            android:layout_marginTop="8dp" />
+    </LinearLayout>
+</LinearLayout>
