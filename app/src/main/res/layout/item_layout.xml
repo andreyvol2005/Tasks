@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:id="@+id/shoppingItemLayout"
+    android:id="@+id/itemLayout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
@@ -28,11 +28,31 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:textSize="16sp"
-        android:text="Название товара"
+        android:text="Название"
         android:textColor="#000000"
         android:gravity="center_vertical"
         android:paddingStart="8dp"
         android:paddingEnd="8dp" />
+
+    <!-- Виден только для "Задачи" и "Не срочные", переносит дело между этими списками -->
+    <ImageButton
+        android:id="@+id/moveButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/edit_button_background"
+        android:src="@android:drawable/ic_menu_send"
+        android:contentDescription="Перенести" />
+
+    <!-- Скрыт для "Покупки" -->
+    <ImageButton
+        android:id="@+id/editButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginEnd="8dp"
+        android:background="@drawable/edit_button_background"
+        android:src="@android:drawable/ic_menu_edit"
+        android:contentDescription="Редактировать" />
 
     <ImageButton
         android:id="@+id/doneButton"
@@ -40,7 +60,6 @@
         android:layout_height="40dp"
         android:background="@drawable/done_button_background"
         android:src="@drawable/ic_check_mark"
-        android:contentDescription="Выполнено"
-        android:onClick="onTaskDoneClick" />
+        android:contentDescription="Выполнено" />
 
 </LinearLayout>
