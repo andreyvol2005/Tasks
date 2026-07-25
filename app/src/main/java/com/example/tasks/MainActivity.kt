@@ -1,5 +1,6 @@
 package com.example.tasks
 
+import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.MotionEvent
@@ -16,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Collections
+import androidx.core.content.edit
 
 class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
 
@@ -27,7 +29,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
     private val items = mutableListOf<ItemEntity>()
     private lateinit var itemsAdapter: ItemsAdapter
 
-    // Состояние перетаскивания
     private var startPosition = -1
     private var currentPosition = -1
     private var isDragging = false
@@ -54,7 +55,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
 
-            // Если клавиатура открыта - используем её отступ, иначе - навигацию
             val finalBottom = if (ime > 0) ime else systemBars.bottom
 
             v.setPadding(0, systemBars.top, 0, finalBottom)
@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun setupAdapter() {
         itemsAdapter = ItemsAdapter(this, items, this)
         binding.itemsListView.adapter = itemsAdapter
@@ -122,12 +123,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         loadItems()
     }
 
-    /**
-     * Внешний вид (цвет, форма, размер) кнопок целиком описан в activity_main.xml
-     * через @drawable/button_category_selected и @drawable/button_category_default.
-     * Здесь мы только выбираем, какой из уже готовых XML-фонов применить -
-     * сам цвет/скругление код не придумывает.
-     */
     private fun highlightCategoryButtons() {
         val buttons = mapOf(
             Category.TASKS to binding.buttonTasks,
@@ -150,14 +145,10 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
             items.clear()
             when {
                 loaded.isNotEmpty() -> items.addAll(loaded)
-                // Демо-данные подставляем только один раз за всё время жизни приложения
-                // для этой категории. Если список пуст потому что пользователь сам всё
-                // удалил, "seeded" уже true и повторно они не появятся.
                 !isCategorySeeded(currentCategory) -> {
                     seedDemoItems()
                     markCategorySeeded(currentCategory)
                 }
-                else -> { /* пользователь намеренно очистил список - оставляем пустым */ }
             }
             itemsAdapter.notifyDataSetChanged()
         }
@@ -167,7 +158,7 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         flagsPrefs.getBoolean(SEEDED_KEY_PREFIX + category.dbKey, false)
 
     private fun markCategorySeeded(category: Category) {
-        flagsPrefs.edit().putBoolean(SEEDED_KEY_PREFIX + category.dbKey, true).apply()
+        flagsPrefs.edit { putBoolean(SEEDED_KEY_PREFIX + category.dbKey, true) }
     }
 
     private suspend fun seedDemoItems() {
@@ -216,7 +207,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
     }
 
-    /** Переносит дело между "Задачи" и "Не срочные" в обе стороны. */
     private fun moveItem(position: Int) {
         val entity = items[position]
         val targetCategory = if (currentCategory == Category.TASKS) Category.NOT_URGENT else Category.TASKS
