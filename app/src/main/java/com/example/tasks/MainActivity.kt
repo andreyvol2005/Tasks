@@ -1,13 +1,10 @@
 package com.example.tasks
 
-import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
-import android.widget.EditText
 import androidx.activity.enableEdgeToEdge
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -17,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Collections
-import androidx.core.content.edit
 
 class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
 
@@ -29,9 +25,15 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
     private val items = mutableListOf<ItemEntity>()
     private lateinit var itemsAdapter: ItemsAdapter
 
+    // Состояние перетаскивания
     private var startPosition = -1
     private var currentPosition = -1
     private var isDragging = false
+
+    // Состояние оверлея ввода текста (Добавить / Редактировать)
+    private enum class InputMode { ADD, EDIT }
+    private var inputMode: InputMode = InputMode.ADD
+    private var editingPosition: Int = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +57,7 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
 
+            // Если клавиатура открыта - используем её отступ, иначе - навигацию
             val finalBottom = if (ime > 0) ime else systemBars.bottom
 
             v.setPadding(0, systemBars.top, 0, finalBottom)
@@ -62,7 +65,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
     }
 
-    @SuppressLint("ClickableViewAccessibility")
     private fun setupAdapter() {
         itemsAdapter = ItemsAdapter(this, items, this)
         binding.itemsListView.adapter = itemsAdapter
@@ -93,26 +95,105 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
 
         binding.addTriggerButton.setOnClickListener { showAddOverlay() }
-        binding.addCancelButton.setOnClickListener { hideAddOverlay() }
-        binding.addConfirmButton.setOnClickListener { confirmAdd() }
-        binding.addOverlay.setOnClickListener { hideAddOverlay() } // тап по затемнению - закрыть
+        binding.inputCancelButton.setOnClickListener { hideInputOverlay() }
+        binding.inputConfirmButton.setOnClickListener { confirmInput() }
+        binding.inputOverlay.setOnClickListener { hideInputOverlay() } // тап по затемнению - закрыть
+
+        binding.confirmOverlay.setOnClickListener { hideConfirmOverlay() } // тап по затемнению - закрыть
     }
 
+    // ----- Оверлей ввода текста (Добавить / Редактировать) -----
+
     private fun showAddOverlay() {
+        inputMode = InputMode.ADD
+        binding.inputOverlayTitle.text = "Новое дело"
+        binding.inputConfirmButton.text = "Добавить"
         binding.itemInput.setText("")
-        binding.addOverlay.visibility = View.VISIBLE
+        binding.inputOverlay.visibility = View.VISIBLE
         binding.itemInput.requestFocus()
     }
 
-    private fun hideAddOverlay() {
-        binding.addOverlay.visibility = View.GONE
+    private fun showEditOverlay(position: Int) {
+        inputMode = InputMode.EDIT
+        editingPosition = position
+        binding.inputOverlayTitle.text = "Редактировать"
+        binding.inputConfirmButton.text = "Сохранить"
+        binding.itemInput.setText(items[position].text)
+        binding.itemInput.setSelection(binding.itemInput.text.length)
+        binding.inputOverlay.visibility = View.VISIBLE
+        binding.itemInput.requestFocus()
+    }
+
+    private fun hideInputOverlay() {
+        binding.inputOverlay.visibility = View.GONE
         binding.itemInput.clearFocus()
     }
 
-    private fun confirmAdd() {
+    private fun confirmInput() {
         val text = binding.itemInput.text.toString().trim()
-        if (text.isNotEmpty()) addItem(text)
-        hideAddOverlay()
+        if (text.isNotEmpty()) {
+            when (inputMode) {
+                InputMode.ADD -> addItem(text)
+                InputMode.EDIT -> editItem(editingPosition, text)
+            }
+        }
+        hideInputOverlay()
+    }
+
+    // ----- Оверлей подтверждения (Выполнено / Перенести) -----
+
+    private fun showDoneConfirm(position: Int) {
+        val text = items[position].text
+
+        binding.confirmTitle.text = "Задача выполнена?"
+        binding.confirmMessage.text = "\"$text\""
+
+        binding.buttonNegative.text = "Отмена"
+        binding.buttonNegative.visibility = View.VISIBLE
+        binding.buttonNegative.setOnClickListener { hideConfirmOverlay() }
+
+        binding.buttonNeutral.text = "Уже не надо!"
+        binding.buttonNeutral.visibility = View.VISIBLE
+        binding.buttonNeutral.setOnClickListener {
+            deleteItem(position)
+            hideConfirmOverlay()
+        }
+
+        binding.buttonPositive.text = "Да!"
+        binding.buttonPositive.visibility = View.VISIBLE
+        binding.buttonPositive.setOnClickListener {
+            deleteItem(position)
+            hideConfirmOverlay()
+        }
+
+        binding.confirmOverlay.visibility = View.VISIBLE
+    }
+
+    private fun showMoveConfirm(position: Int) {
+        val targetName =
+            if (currentCategory == Category.TASKS) Category.NOT_URGENT.displayName else Category.TASKS.displayName
+
+        binding.confirmTitle.text = "Перенести дело?"
+        binding.confirmMessage.text = "Перенести \"${items[position].text}\" в раздел «$targetName»?"
+
+        binding.buttonNegative.text = "Отмена"
+        binding.buttonNegative.visibility = View.VISIBLE
+        binding.buttonNegative.setOnClickListener { hideConfirmOverlay() }
+
+        binding.buttonNeutral.visibility = View.GONE
+
+        binding.buttonPositive.text = "Перенести"
+        binding.buttonPositive.visibility = View.VISIBLE
+        binding.buttonPositive.setOnClickListener {
+            moveItem(position)
+            hideConfirmOverlay()
+        }
+
+        binding.confirmOverlay.visibility = View.VISIBLE
+    }
+
+    private fun hideConfirmOverlay() {
+        binding.confirmOverlay.visibility = View.GONE
     }
 
     private fun switchCategory(category: Category) {
@@ -123,6 +204,12 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         loadItems()
     }
 
+    /**
+     * Внешний вид (цвет, форма, размер) кнопок целиком описан в activity_main.xml
+     * через @drawable/button_category_selected и @drawable/button_category_default.
+     * Здесь мы только выбираем, какой из уже готовых XML-фонов применить -
+     * сам цвет/скругление код не придумывает.
+     */
     private fun highlightCategoryButtons() {
         val buttons = mapOf(
             Category.TASKS to binding.buttonTasks,
@@ -145,10 +232,14 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
             items.clear()
             when {
                 loaded.isNotEmpty() -> items.addAll(loaded)
+                // Демо-данные подставляем только один раз за всё время жизни приложения
+                // для этой категории. Если список пуст потому что пользователь сам всё
+                // удалил, "seeded" уже true и повторно они не появятся.
                 !isCategorySeeded(currentCategory) -> {
                     seedDemoItems()
                     markCategorySeeded(currentCategory)
                 }
+                else -> { /* пользователь намеренно очистил список - оставляем пустым */ }
             }
             itemsAdapter.notifyDataSetChanged()
         }
@@ -158,7 +249,7 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         flagsPrefs.getBoolean(SEEDED_KEY_PREFIX + category.dbKey, false)
 
     private fun markCategorySeeded(category: Category) {
-        flagsPrefs.edit { putBoolean(SEEDED_KEY_PREFIX + category.dbKey, true) }
+        flagsPrefs.edit().putBoolean(SEEDED_KEY_PREFIX + category.dbKey, true).apply()
     }
 
     private suspend fun seedDemoItems() {
@@ -207,6 +298,7 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
     }
 
+    /** Переносит дело между "Задачи" и "Не срочные" в обе стороны. */
     private fun moveItem(position: Int) {
         val entity = items[position]
         val targetCategory = if (currentCategory == Category.TASKS) Category.NOT_URGENT else Category.TASKS
@@ -264,46 +356,6 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         }
     }
 
-    // ----- Диалоги -----
-
-    private fun showEditDialog(position: Int) {
-        val editText = EditText(this)
-        editText.setText(items[position].text)
-        editText.setSelection(editText.text.length)
-
-        AlertDialog.Builder(this)
-            .setTitle("Редактировать")
-            .setView(editText)
-            .setPositiveButton("Сохранить") { _, _ ->
-                val newText = editText.text.toString().trim()
-                if (newText.isNotEmpty()) editItem(position, newText)
-            }
-            .setNegativeButton("Отмена", null)
-            .show()
-    }
-
-    private fun showDoneDialog(position: Int) {
-        val text = items[position].text
-        AlertDialog.Builder(this)
-            .setTitle("Задача выполнена?")
-            .setMessage("\"$text\"")
-            .setNegativeButton("Отмена", null)
-            .setPositiveButton("Уже не надо!") { _, _ -> deleteItem(position) }
-            .setNeutralButton("Да!") { _, _ -> deleteItem(position) }
-            .show()
-    }
-
-    private fun confirmMove(position: Int) {
-        val targetName =
-            if (currentCategory == Category.TASKS) Category.NOT_URGENT.displayName else Category.TASKS.displayName
-        AlertDialog.Builder(this)
-            .setTitle("Перенести дело?")
-            .setMessage("Перенести \"${items[position].text}\" в раздел «$targetName»?")
-            .setNegativeButton("Отмена", null)
-            .setPositiveButton("Перенести") { _, _ -> moveItem(position) }
-            .show()
-    }
-
     // ----- ItemsAdapter.Callbacks -----
 
     override fun isEditHidden(): Boolean = currentCategory == Category.SHOPPING
@@ -317,15 +369,15 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
 
     override fun onDragHandleDown(position: Int) = startDrag(position)
 
-    override fun onEditClick(position: Int) = showEditDialog(position)
+    override fun onEditClick(position: Int) = showEditOverlay(position)
 
-    override fun onMoveClick(position: Int) = confirmMove(position)
+    override fun onMoveClick(position: Int) = showMoveConfirm(position)
 
     override fun onDoneClick(position: Int) {
         if (currentCategory == Category.SHOPPING) {
             deleteItem(position)
         } else {
-            showDoneDialog(position)
+            showDoneConfirm(position)
         }
     }
 }
