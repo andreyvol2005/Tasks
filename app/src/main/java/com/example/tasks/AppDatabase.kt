@@ -23,8 +23,11 @@ abstract class AppDatabase : RoomDatabase() {
          * При первой установке база создаётся сразу с версией 2, поэтому встроенных
          * категорий в ней нет - их кладёт этот колбэк. При обновлении с v1 их создаёт
          * [MIGRATION_1_2], и колбэк не вызывается.
+         *
+         * Открыт наружу, потому что тесты собирают in-memory базу и должны получить
+         * то же самое состояние, что и настоящее приложение.
          */
-        private val callback = object : Callback() {
+        val seedCallback: Callback = object : Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 BuiltInCategories.ALL.forEach { category ->
                     db.execSQL(
@@ -46,7 +49,7 @@ abstract class AppDatabase : RoomDatabase() {
                     DB_NAME
                 )
                     .addMigrations(MIGRATION_1_2)
-                    .addCallback(callback)
+                    .addCallback(seedCallback)
                     .build()
                     .also { INSTANCE = it }
             }

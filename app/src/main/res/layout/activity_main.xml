@@ -154,18 +154,23 @@
             <!-- Пустое состояние -->
             <LinearLayout
                 android:id="@+id/emptyState"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:background="@drawable/card_background"
                 android:gravity="center"
                 android:orientation="vertical"
+                android:paddingHorizontal="28dp"
+                android:paddingVertical="24dp"
                 android:visibility="gone">
 
                 <ImageView
-                    android:layout_width="56dp"
-                    android:layout_height="56dp"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
                     android:alpha="0.6"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_list" />
+                    android:src="@drawable/ic_list"
+                    app:tint="@color/text_secondary" />
 
                 <TextView
                     android:id="@+id/emptyTitle"
@@ -182,6 +187,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="4dp"
+                    android:gravity="center"
                     android:textColor="@color/text_secondary"
                     android:textSize="14sp" />
 

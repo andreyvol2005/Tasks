@@ -37,6 +37,12 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    sourceSets {
+        // MigrationTestHelper читает схемы из assets - отдаём ему папку app/schemas
+        getByName("androidTest") {
+            assets.srcDir("$projectDir/schemas")
+        }
+    }
 }
 
 ksp {
@@ -58,6 +64,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+
+    // Room 2.8.x разбирает схемы через kotlinx-serialization. В графе есть BOM 1.7.3
+    // со строгим require, из-за чего core уезжает на 1.7.3, а json остаётся на 1.11,
+    // и MigrationTestHelper падает с AbstractMethodError. Поднимаем всё сразу:
+    // consistent resolution требует, чтобы основной и тестовый classpath совпадали.
+    implementation(enforcedPlatform("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.11.0"))
 
     testImplementation(libs.junit)
     testImplementation(libs.androidx.arch.core.testing)
