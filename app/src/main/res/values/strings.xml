@@ -87,4 +87,5 @@
     <string name="cd_done">Отметить выполненным</string>
     <string name="cd_more">Ещё</string>
     <string name="cd_app_icon">Задачи</string>
+    <string name="widget_empty">Список пуст</string>
 </resources>
