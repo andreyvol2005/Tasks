@@ -425,8 +425,23 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
     }
 
     private fun consumeQuickAdd(intent: Intent?) {
-        val text = intent?.getStringExtra(EXTRA_QUICK_ADD_TEXT) ?: return
-        intent.removeExtra(EXTRA_QUICK_ADD_TEXT)
+        if (intent == null) return
+
+        // Виджет: кнопка "+" или тап по строке.
+        val categoryId = intent.getLongExtra(EXTRA_CATEGORY_ID, -1L)
+        if (categoryId > 0) {
+            intent.removeExtra(EXTRA_CATEGORY_ID)
+            viewModel.selectCategory(categoryId)
+        }
+        if (intent.getBooleanExtra(EXTRA_OPEN_EDITOR, false)) {
+            intent.removeExtra(EXTRA_OPEN_EDITOR)
+            openItemEditor(null)
+            return
+        }
+
+        // Отправка текста из другого приложения.
+        val text = intent.getStringExtra(Intent.EXTRA_TEXT) ?: return
+        intent.removeExtra(Intent.EXTRA_TEXT)
         viewModel.addItem(text.trim()) { created ->
             if (created != null) showSnackbar(getString(R.string.snackbar_item_added, created.text))
         }
@@ -569,6 +584,8 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
 
     companion object {
         const val EXTRA_QUICK_ADD_TEXT = "quick_add_text"
+        const val EXTRA_OPEN_EDITOR = "open_editor"
+        const val EXTRA_CATEGORY_ID = "category_id"
         private const val TAG_ITEM_EDITOR = "itemEditor"
         private const val STATE_CATEGORY = "selected_category"
         private const val ID_CLEAR_CATEGORY = 1
