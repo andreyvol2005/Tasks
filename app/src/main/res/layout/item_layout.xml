@@ -33,15 +33,21 @@
         app:layout_constraintTop_toTopOf="parent"
         app:tint="@color/text_hint" />
 
-    <com.google.android.material.checkbox.MaterialCheckBox
-        android:id="@+id/doneCheck"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_done"
-        android:minWidth="48dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintStart_toEndOf="@id/dragHandle"
-        app:layout_constraintTop_toTopOf="parent" />
+    <!-- Чекбокс сделан кнопкой с двумя состояниями: и системный CheckBox, и MaterialCheckBox
+     на полупрозрачной карточке рисовались белым квадратом без галочки. -->
+        <ImageView
+            android:id="@+id/doneCheck"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="@drawable/check_bg_off"
+            android:clickable="true"
+            android:contentDescription="@string/action_done"
+            android:focusable="true"
+            android:padding="8dp"
+            android:src="@drawable/ic_box_off"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/dragHandle"
+            app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/itemText"

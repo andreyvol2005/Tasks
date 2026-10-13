@@ -123,16 +123,23 @@ class ItemsAdapter(
             } else {
                 binding.itemText.paintFlags and android.graphics.Paint.STRIKE_THRU_TEXT_FLAG.inv()
             }
-            binding.itemLayout.alpha = if (item.done) 0.55f else 1f
+            // Гасим только текст: раньше alpha ставилась на всю карточку, и на
+            // полупрозрачном фоне выполненный элемент почти исчезал вместе с фоном.
+            binding.itemText.alpha = if (item.done) 0.5f else 1f
+            binding.itemMeta.alpha = if (item.done) 0.5f else 1f
 
-            // Снимаем слушатель, иначе MaterialCheckBox переиспользует колбэк
-            // от предыдущего элемента и отметит не тот список.
-            binding.doneCheck.setOnCheckedChangeListener(null)
-            binding.doneCheck.isChecked = item.done
-            binding.doneCheck.contentDescription = context.getString(R.string.action_done)
-            binding.doneCheck.setOnCheckedChangeListener { _, checked ->
+            // Отметка выполнения. Раньше это был CheckBox, но ни системный, ни
+            // MaterialCheckBox на полупрозрачной карточке не рисуются корректно,
+            // поэтому состояние переключается вручную.
+            binding.doneCheck.setBackgroundResource(
+                if (item.done) R.drawable.check_bg_on else R.drawable.check_bg_off
+            )
+            binding.doneCheck.setImageResource(
+                if (item.done) R.drawable.ic_check_on_green else R.drawable.ic_box_off
+            )
+            binding.doneCheck.setOnClickListener {
                 val pos = bindingAdapterPosition
-                if (pos != RecyclerView.NO_POSITION) callbacks.onDoneChanged(items[pos], checked)
+                if (pos != RecyclerView.NO_POSITION) callbacks.onDoneChanged(items[pos], !items[pos].done)
             }
 
             binding.priorityStripe.setBackgroundColor(
