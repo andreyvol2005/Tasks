@@ -1,65 +1,93 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/itemLayout"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:background="@drawable/blur_background"
-    android:layout_marginStart="8dp"
-    android:layout_marginEnd="8dp"
-    android:layout_marginTop="4dp"
-    android:layout_marginBottom="4dp"
-    android:padding="16dp"
-    android:elevation="2dp">
+    android:layout_marginVertical="4dp"
+    android:background="@drawable/card_background"
+    android:elevation="2dp"
+    android:paddingEnd="8dp"
+    android:paddingStart="0dp">
 
-    <ImageButton
+    <!-- Полоса приоритета, слева -->
+    <View
+        android:id="@+id/priorityStripe"
+        android:layout_width="5dp"
+        android:layout_height="0dp"
+        android:background="@color/priority_normal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageView
         android:id="@+id/dragHandle"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginEnd="12dp"
-        android:layout_gravity="center_vertical"
-        android:background="@drawable/edit_button_background"
-        android:src="@android:drawable/ic_menu_sort_by_size"
-        android:contentDescription="Перетащить" />
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:contentDescription="@string/cd_drag_handle"
+        android:padding="10dp"
+        android:src="@drawable/ic_drag_handle"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/priorityStripe"
+        app:layout_constraintTop_toTopOf="parent"
+        app:tint="@color/text_hint" />
+
+    <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/doneCheck"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:contentDescription="@string/action_done"
+        android:minWidth="48dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toEndOf="@id/dragHandle"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <TextView
         android:id="@+id/itemText"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
+        android:layout_marginStart="4dp"
+        android:textColor="@color/text_primary"
         android:textSize="16sp"
-        android:text="Название"
-        android:textColor="#000000"
-        android:gravity="center_vertical"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp" />
+        app:layout_constraintEnd_toStartOf="@id/overflowButton"
+        app:layout_constraintStart_toEndOf="@id/doneCheck"
+        app:layout_constraintTop_toTopOf="@id/dragHandle" />
 
-    <!-- Виден только для "Задачи" и "Не срочные", переносит дело между этими списками -->
+    <TextView
+        android:id="@+id/itemCategory"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/icon_button_background"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="11sp"
+        android:visibility="gone"
+        app:layout_constraintStart_toEndOf="@id/doneCheck"
+        app:layout_constraintTop_toBottomOf="@id/itemText" />
+
+    <TextView
+        android:id="@+id/itemMeta"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="@color/text_secondary"
+        android:textSize="12sp"
+        android:visibility="gone"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/overflowButton"
+        app:layout_constraintStart_toEndOf="@id/doneCheck"
+        app:layout_constraintTop_toBottomOf="@id/itemCategory" />
+
     <ImageButton
-        android:id="@+id/moveButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/edit_button_background"
-        android:src="@android:drawable/ic_menu_send"
-        android:contentDescription="Перенести" />
+        android:id="@+id/overflowButton"
+        style="@style/ItemActionButton"
+        android:contentDescription="@string/cd_more"
+        android:src="@drawable/ic_more_vert"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
-    <!-- Скрыт для "Покупки" -->
-    <ImageButton
-        android:id="@+id/editButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:layout_marginEnd="8dp"
-        android:background="@drawable/edit_button_background"
-        android:src="@android:drawable/ic_menu_edit"
-        android:contentDescription="Редактировать" />
-
-    <ImageButton
-        android:id="@+id/doneButton"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
-        android:background="@drawable/done_button_background"
-        android:src="@drawable/ic_check_mark"
-        android:contentDescription="Выполнено" />
-
-</LinearLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

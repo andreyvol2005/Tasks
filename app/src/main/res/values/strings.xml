@@ -1,3 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Задачи</string>
+
+    <!-- Категории -->
+    <string name="category_tasks">Список задач</string>
+    <string name="category_shopping">Список покупок</string>
+    <string name="category_not_urgent">Не срочные дела</string>
+    <string name="category_kind_tasks">Задачи</string>
+    <string name="category_kind_shopping">Покупки</string>
+    <string name="category_counter">%1$s · %2$d</string>
+
+    <!-- Пустой список -->
+    <string name="empty_title">Пока пусто</string>
+    <string name="empty_hint_tasks">Добавьте первое дело кнопкой ниже</string>
+    <string name="empty_hint_shopping">Добавьте первый товар кнопкой ниже</string>
+    <string name="empty_search">Ничего не найдено</string>
+
+    <!-- Действия -->
+    <string name="action_add">Добавить</string>
+    <string name="action_edit">Редактировать</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_save">Сохранить</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_undo">Вернуть</string>
+    <string name="action_done">Выполнено</string>
+    <string name="action_reopen">Вернуть в работу</string>
+    <string name="action_move">Перенести</string>
+    <string name="action_move_to">Перенести в «%1$s»</string>
+    <string name="action_sort">Сортировка</string>
+    <string name="action_clear_category">Очистить список</string>
+    <string name="action_clear_completed">Убрать выполненные</string>
+    <string name="action_categories">Списки</string>
+    <string name="action_rename_category">Переименовать список</string>
+    <string name="action_delete_category">Удалить список</string>
+
+    <!-- Сортировка -->
+    <string name="sort_manual">Как вручную</string>
+    <string name="sort_priority">По важности</string>
+    <string name="sort_date">По сроку</string>
+    <string name="sort_name">По алфавиту</string>
+
+    <!-- Диалог добавления/редактирования -->
+    <string name="dialog_add_title">Новое дело</string>
+    <string name="dialog_edit_title">Редактировать</string>
+    <string name="dialog_text_hint">Что нужно сделать</string>
+    <string name="dialog_priority">Важность</string>
+    <string name="priority_normal">Обычное</string>
+    <string name="priority_high">Важное</string>
+    <string name="priority_urgent">Срочное</string>
+    <string name="dialog_due_date">Срок</string>
+    <string name="dialog_due_date_pick">Выбрать дату</string>
+    <string name="dialog_due_date_clear">Убрать срок</string>
+    <string name="dialog_quantity_hint">Количество, например 2 кг</string>
+    <string name="dialog_price_hint">Цена</string>
+    <string name="dialog_error_empty">Введите текст</string>
+    <string name="dialog_error_name_taken">Такой список уже есть</string>
+
+    <!-- Подтверждения -->
+    <string name="confirm_clear_title">Очистить «%1$s»?</string>
+    <string name="confirm_clear_message">Все %1$d элементов будут удалены. Действие можно отменить.</string>
+    <string name="confirm_clear_completed_title">Убрать выполненные?</string>
+    <string name="confirm_clear_completed_message">Удалено выполненных: %1$d.</string>
+    <string name="confirm_delete_category_title">Удалить «%1$s»?</string>
+    <string name="confirm_delete_category_message">Список и все его элементы будут удалены безвозвратно.</string>
+    <string name="confirm_builtin_category">Встроенный список удалить нельзя</string>
+
+    <!-- Поиск -->
+    <string name="search_hint">Поиск по делам</string>
+    <string name="search_scope_current">В этом списке</string>
+    <string name="search_scope_all">Во всех списках</string>
+
+    <!-- Прочее -->
+    <string name="due_today">Сегодня</string>
+    <string name="due_tomorrow">Завтра</string>
+    <string name="due_overdue">Просрочено</string>
+    <string name="item_meta_shopping">%1$s · %2$s</string>
+    <string name="total_label">Итого: %1$s</string>
+    <string name="snackbar_item_deleted">«%1$s» удалено</string>
+    <string name="snackbar_item_added">«%1$s» добавлено</string>
+    <string name="snackbar_item_moved">Перенесено в «%1$s»</string>
+    <string name="snackbar_undo">Вернуть</string>
+    <string name="snackbar_category_cleared">Список очищен</string>
+    <string name="snackbar_completed_cleared">Выполненные убраны</string>
+    <string name="snackbar_category_deleted">Список «%1$s» удалён</string>
+    <string name="cd_drag_handle">Перетащить</string>
+    <string name="cd_done">Отметить выполненным</string>
+    <string name="cd_more">Ещё</string>
+    <string name="cd_app_icon">Задачи</string>
 </resources>

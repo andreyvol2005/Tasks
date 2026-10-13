@@ -5,4 +5,27 @@
     <color name="white">#FFFFFF</color>
     <color name="button_selected">#FF6B4EFF</color>
     <color name="button_default">#FFB0AEEA</color>
+
+    <!-- Поверхности -->
+    <color name="surface_card">#F2FFFFFF</color>
+    <color name="surface_card_stroke">#80FFFFFF</color>
+    <color name="scrim">#88000000</color>
+    <color name="background_scrim">#00000000</color>
+    <color name="background_scrim_night">#B3000000</color>
+
+    <!-- Текст -->
+    <color name="text_primary">#1B1B1F</color>
+    <color name="text_secondary">#5B5B66</color>
+    <color name="text_hint">#8A8A94</color>
+    <color name="text_on_primary">#FFFFFF</color>
+
+    <!-- Приоритеты -->
+    <color name="priority_normal">#00000000</color>
+    <color name="priority_high">#FFB300</color>
+    <color name="priority_urgent">#E53935</color>
+
+    <!-- Состояния -->
+    <color name="item_done_alpha">#61B1B1B8</color>
+    <color name="due_overdue">#E53935</color>
+    <color name="divider">#1F000000</color>
 </resources>

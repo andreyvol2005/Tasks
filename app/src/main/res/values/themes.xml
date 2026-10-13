@@ -1,14 +1,27 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
     <style name="Base.Theme.Tasks" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="colorPrimary">@color/green_primary</item>
-        <item name="colorPrimaryVariant">@color/green_dark</item>
-        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorOnPrimary">@color/text_on_primary</item>
+        <item name="android:windowBackground">@android:color/black</item>
     </style>
 
     <style name="RoundedButton" parent="Widget.Material3.Button">
         <item name="cornerRadius">24dp</item>
         <item name="android:backgroundTint">@color/green_primary</item>
-        <item name="android:textColor">@color/white</item>
-        <item name="android:layout_margin">4dp</item>
+        <item name="android:textColor">@color/text_on_primary</item>
+    </style>
+
+    <style name="CardSurface">
+        <item name="android:background">@drawable/card_background</item>
+        <item name="android:elevation">2dp</item>
+    </style>
+
+    <style name="ItemActionButton">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">@drawable/icon_button_background</item>
+        <item name="android:padding">10dp</item>
+        <item name="android:scaleType">fitCenter</item>
     </style>
 </resources>
