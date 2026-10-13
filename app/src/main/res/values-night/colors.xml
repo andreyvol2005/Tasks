@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Фон приложения - фотография, поэтому в тёмной теме поверх неё кладётся
+      плотный скрим, иначе чёрный текст на фото нечитаем.
+    -->
+    <color name="background_scrim">#66000000</color>
+
+    <color name="surface_card">#F21E1E22</color>
+    <color name="surface_card_stroke">#33FFFFFF</color>
+
+    <color name="text_primary">#F2F2F5</color>
+    <color name="text_secondary">#B9B9C2</color>
+    <color name="text_hint">#8A8A94</color>
+    <color name="text_on_primary">#FFFFFF</color>
+
+    <color name="item_done_alpha">#61FFFFFF</color>
+    <color name="divider">#1FFFFFFF</color>
+
+    <color name="button_selected">#FF8A78FF</color>
+    <color name="button_default">#FF57546E</color>
+</resources>

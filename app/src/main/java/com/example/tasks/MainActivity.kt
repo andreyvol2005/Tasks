@@ -1,39 +1,54 @@
 package com.example.tasks
 
-import android.content.SharedPreferences
+import android.content.Intent
+import android.graphics.Canvas
 import android.os.Bundle
-import android.view.MotionEvent
+import android.view.HapticFeedbackConstants
 import android.view.View
+import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.ViewCompat
+
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
+import androidx.core.widget.doAfterTextChanged
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.ItemTouchHelper
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.example.tasks.databinding.ActivityMainBinding
-import kotlinx.coroutines.Dispatchers
+import com.google.android.material.chip.Chip
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.Collections
+import java.text.NumberFormat
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
 
     private lateinit var binding: ActivityMainBinding
-    private lateinit var dao: ItemDao
-    private lateinit var flagsPrefs: SharedPreferences
+    private lateinit var touchHelper: ItemTouchHelper
+    private val viewModel: MainViewModel by viewModels()
 
-    private var currentCategory: Category = Category.TASKS
-    private val items = mutableListOf<ItemEntity>()
-    private lateinit var itemsAdapter: ItemsAdapter
+    private lateinit var adapter: ItemsAdapter
 
-    // Состояние перетаскивания
-    private var startPosition = -1
-    private var currentPosition = -1
+    /** Порядок, который пользователь уже выстроил мышью и который ещё не записан в БД. */
+    private var pendingOrder: List<ItemEntity>? = null
     private var isDragging = false
+    private var chipIds: Map<Long, Int> = emptyMap()
+    private var resultListenerBound = false
 
-    // Состояние оверлея ввода текста (Добавить / Редактировать)
-    private enum class InputMode { ADD, EDIT }
-    private var inputMode: InputMode = InputMode.ADD
-    private var editingPosition: Int = -1
+    private val chipIdSource = AtomicInteger(1)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,341 +58,524 @@ class MainActivity : AppCompatActivity(), ItemsAdapter.Callbacks {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        dao = AppDatabase.getInstance(this).itemDao()
-        flagsPrefs = getSharedPreferences("app_flags", MODE_PRIVATE)
+        setupInsets()
+        setupList()
+        setupClicks()
+        bindFragmentResults()
+        observeState()
 
-        applyInsets()
-        setupAdapter()
-        setupClickListeners()
-        switchCategory(Category.TASKS)
+        viewModel.restoreCategory(savedInstanceState?.getLong(STATE_CATEGORY))
+        consumeQuickAdd(intent)
     }
 
-    private fun applyInsets() {
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // Раньше при повороте экрана активность всегда открывала «Список задач».
+        outState.putLong(STATE_CATEGORY, viewModel.currentCategoryId.value)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        consumeQuickAdd(intent)
+    }
+
+    // --- Раскладка ---
+
+    private fun setupInsets() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.updatePadding(top = bars.top, left = bars.left, right = bars.right, bottom = bars.bottom)
+            insets
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.itemsList) { v, insets ->
             val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            v.updatePadding(bottom = if (ime > 0) 16.dp else 88.dp)
+            insets
+        }
 
-            // Если клавиатура открыта - используем её отступ, иначе - навигацию
-            val finalBottom = if (ime > 0) ime else systemBars.bottom
-
-            v.setPadding(0, systemBars.top, 0, finalBottom)
+        // Клавиатура поднимает FAB плавно. Раньше стоял adjustResize с ручным padding,
+// и список дёргался вверх скачком.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.addButton) { button, insets ->
+            val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val shift = -imeBottom.toFloat()
+            if (button.translationY != shift) {
+                button.animate()
+                    .translationY(shift)
+                    .setDuration(if (imeBottom > 0) 180L else 0L)
+                    .start()
+            }
             insets
         }
     }
 
-    private fun setupAdapter() {
-        itemsAdapter = ItemsAdapter(this, items, this)
-        binding.itemsListView.adapter = itemsAdapter
+    private fun setupList() {
+        adapter = ItemsAdapter(this)
+        binding.itemsList.layoutManager = LinearLayoutManager(this)
+        binding.itemsList.adapter = adapter
+        binding.itemsList.itemAnimator?.changeDuration = 0
 
-        binding.itemsListView.setOnTouchListener { _, event ->
-            if (isDragging) {
-                when (event.action) {
-                    MotionEvent.ACTION_MOVE -> updateDragPosition(event.rawY.toInt())
-                    MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> endDrag()
-                }
-                return@setOnTouchListener true
-            }
-            false
+        touchHelper = ItemTouchHelper(DragCallback())
+        touchHelper.attachToRecyclerView(binding.itemsList)
+    }
+
+    private fun setupClicks() {
+        binding.addButton.setOnClickListener { openItemEditor(null) }
+        binding.overflowButton.setOnClickListener { showMainMenu(it) }
+        binding.sortButton.setOnClickListener { showSortMenu(it) }
+        binding.categoriesButton.setOnClickListener { showCategoriesMenu(it) }
+        binding.searchButton.setOnClickListener { viewModel.setSearchActive(true) }
+
+        binding.searchInput.doAfterTextChanged { viewModel.setQuery(it?.toString().orEmpty()) }
+        binding.searchCloseButton.setOnClickListener {
+            binding.searchInput.setText("")
+            viewModel.setQuery("")
+            viewModel.setSearchActive(false)
+        }
+        binding.searchInput.setOnEditorActionListener { _, _, _ ->
+            viewModel.setSearchActive(true)
+            true
         }
     }
 
-    private fun setupClickListeners() {
-        binding.buttonTasks.setOnClickListener { switchCategory(Category.TASKS) }
-        binding.buttonShopping.setOnClickListener { switchCategory(Category.SHOPPING) }
-        binding.buttonNotUrgent.setOnClickListener { switchCategory(Category.NOT_URGENT) }
+    private fun bindFragmentResults() {
+        if (resultListenerBound) return
+        resultListenerBound = true
+        supportFragmentManager.setFragmentResultListener(ItemEditDialog.REQUEST_KEY, this) { _, bundle ->
+            val text = bundle.getString(ItemEditDialog.ARG_RESULT_TEXT) ?: return@setFragmentResultListener
+            val itemId = bundle.getLong(ItemEditDialog.ARG_RESULT_ITEM_ID, 0L)
+            val priority = bundle.getInt(ItemEditDialog.ARG_RESULT_PRIORITY, Priority.NORMAL)
+            val dueAt = bundle.getLong(ItemEditDialog.ARG_RESULT_DUE_AT, ItemEditDialog.NO_DUE)
+                .takeIf { it != ItemEditDialog.NO_DUE }
+            val quantity = bundle.getString(ItemEditDialog.ARG_RESULT_QUANTITY)
+            val priceCents = bundle.getLong(ItemEditDialog.ARG_RESULT_PRICE_CENTS, ItemEditDialog.NO_PRICE)
+                .takeIf { it != ItemEditDialog.NO_PRICE }
+            val isShopping = bundle.getBoolean(ItemEditDialog.ARG_RESULT_IS_SHOPPING, false)
 
-        binding.clearAllButton.setOnClickListener {
-            lifecycleScope.launch {
-                withContext(Dispatchers.IO) { dao.clearCategory(currentCategory.dbKey) }
-                items.clear()
-                itemsAdapter.notifyDataSetChanged()
-            }
-        }
+            val existing = adapter.itemAt(adapter.currentList.indexOfFirst { it.id == itemId })
+                ?: adapter.currentList.firstOrNull { it.id == itemId }
 
-        binding.addTriggerButton.setOnClickListener { showAddOverlay() }
-        binding.inputCancelButton.setOnClickListener { hideInputOverlay() }
-        binding.inputConfirmButton.setOnClickListener { confirmInput() }
-        binding.inputOverlay.setOnClickListener { hideInputOverlay() } // тап по затемнению - закрыть
-
-        binding.confirmOverlay.setOnClickListener { hideConfirmOverlay() } // тап по затемнению - закрыть
-    }
-
-    // ----- Оверлей ввода текста (Добавить / Редактировать) -----
-
-    private fun showAddOverlay() {
-        inputMode = InputMode.ADD
-        binding.inputOverlayTitle.text = "Новое дело"
-        binding.inputConfirmButton.text = "Добавить"
-        binding.itemInput.setText("")
-        binding.inputOverlay.visibility = View.VISIBLE
-        binding.itemInput.requestFocus()
-    }
-
-    private fun showEditOverlay(position: Int) {
-        inputMode = InputMode.EDIT
-        editingPosition = position
-        binding.inputOverlayTitle.text = "Редактировать"
-        binding.inputConfirmButton.text = "Сохранить"
-        binding.itemInput.setText(items[position].text)
-        binding.itemInput.setSelection(binding.itemInput.text.length)
-        binding.inputOverlay.visibility = View.VISIBLE
-        binding.itemInput.requestFocus()
-    }
-
-    private fun hideInputOverlay() {
-        binding.inputOverlay.visibility = View.GONE
-        binding.itemInput.clearFocus()
-    }
-
-    private fun confirmInput() {
-        val text = binding.itemInput.text.toString().trim()
-        if (text.isNotEmpty()) {
-            when (inputMode) {
-                InputMode.ADD -> addItem(text)
-                InputMode.EDIT -> editItem(editingPosition, text)
-            }
-        }
-        hideInputOverlay()
-    }
-
-    // ----- Оверлей подтверждения (Выполнено / Перенести) -----
-
-    private fun showDoneConfirm(position: Int) {
-        val text = items[position].text
-
-        binding.confirmTitle.text = "Задача выполнена?"
-        binding.confirmMessage.text = "\"$text\""
-
-        binding.buttonNegative.text = "Отмена"
-        binding.buttonNegative.visibility = View.VISIBLE
-        binding.buttonNegative.setOnClickListener { hideConfirmOverlay() }
-
-        binding.buttonNeutral.text = "Уже не надо!"
-        binding.buttonNeutral.visibility = View.VISIBLE
-        binding.buttonNeutral.setOnClickListener {
-            deleteItem(position)
-            hideConfirmOverlay()
-        }
-
-        binding.buttonPositive.text = "Да!"
-        binding.buttonPositive.visibility = View.VISIBLE
-        binding.buttonPositive.setOnClickListener {
-            deleteItem(position)
-            hideConfirmOverlay()
-        }
-
-        binding.confirmOverlay.visibility = View.VISIBLE
-    }
-
-    private fun showMoveConfirm(position: Int) {
-        val targetName =
-            if (currentCategory == Category.TASKS) Category.NOT_URGENT.displayName else Category.TASKS.displayName
-
-        binding.confirmTitle.text = "Перенести дело?"
-        binding.confirmMessage.text = "Перенести \"${items[position].text}\" в раздел «$targetName»?"
-
-        binding.buttonNegative.text = "Отмена"
-        binding.buttonNegative.visibility = View.VISIBLE
-        binding.buttonNegative.setOnClickListener { hideConfirmOverlay() }
-
-        binding.buttonNeutral.visibility = View.GONE
-
-        binding.buttonPositive.text = "Перенести"
-        binding.buttonPositive.visibility = View.VISIBLE
-        binding.buttonPositive.setOnClickListener {
-            moveItem(position)
-            hideConfirmOverlay()
-        }
-
-        binding.confirmOverlay.visibility = View.VISIBLE
-    }
-
-    private fun hideConfirmOverlay() {
-        binding.confirmOverlay.visibility = View.GONE
-    }
-
-    private fun switchCategory(category: Category) {
-        currentCategory = category
-        binding.titleText.text = category.displayName
-        binding.clearAllButton.visibility = if (category == Category.SHOPPING) View.VISIBLE else View.GONE
-        highlightCategoryButtons()
-        loadItems()
-    }
-
-    /**
-     * Внешний вид (цвет, форма, размер) кнопок целиком описан в activity_main.xml
-     * через @drawable/button_category_selected и @drawable/button_category_default.
-     * Здесь мы только выбираем, какой из уже готовых XML-фонов применить -
-     * сам цвет/скругление код не придумывает.
-     */
-    private fun highlightCategoryButtons() {
-        val buttons = mapOf(
-            Category.TASKS to binding.buttonTasks,
-            Category.SHOPPING to binding.buttonShopping,
-            Category.NOT_URGENT to binding.buttonNotUrgent
-        )
-        buttons.forEach { (cat, button) ->
-            val backgroundRes = if (cat == currentCategory) {
-                R.drawable.button_category_selected
+            if (existing != null) {
+                viewModel.updateItem(existing, text, priority, dueAt, quantity, priceCents)
             } else {
-                R.drawable.button_category_default
-            }
-            button.setBackgroundResource(backgroundRes)
-        }
-    }
-
-    private fun loadItems() {
-        lifecycleScope.launch {
-            val loaded = withContext(Dispatchers.IO) { dao.getByCategory(currentCategory.dbKey) }
-            items.clear()
-            when {
-                loaded.isNotEmpty() -> items.addAll(loaded)
-                // Демо-данные подставляем только один раз за всё время жизни приложения
-                // для этой категории. Если список пуст потому что пользователь сам всё
-                // удалил, "seeded" уже true и повторно они не появятся.
-                !isCategorySeeded(currentCategory) -> {
-                    seedDemoItems()
-                    markCategorySeeded(currentCategory)
+                viewModel.addItem(
+                    text = text,
+                    priority = if (isShopping) Priority.NORMAL else priority,
+                    dueAt = if (isShopping) null else dueAt,
+                    quantity = if (isShopping) quantity else null,
+                    priceCents = if (isShopping) priceCents else null
+                ) { created ->
+                    if (created != null) showSnackbar(getString(R.string.snackbar_item_added, created.text))
                 }
-                else -> { /* пользователь намеренно очистил список - оставляем пустым */ }
-            }
-            itemsAdapter.notifyDataSetChanged()
-        }
-    }
-
-    private fun isCategorySeeded(category: Category): Boolean =
-        flagsPrefs.getBoolean(SEEDED_KEY_PREFIX + category.dbKey, false)
-
-    private fun markCategorySeeded(category: Category) {
-        flagsPrefs.edit().putBoolean(SEEDED_KEY_PREFIX + category.dbKey, true).apply()
-    }
-
-    private suspend fun seedDemoItems() {
-        val demo = when (currentCategory) {
-            Category.TASKS -> listOf("Сделать домашнее задание", "Позвонить маме", "Записаться к врачу")
-            Category.SHOPPING -> listOf("Молоко", "Хлеб", "Яйца", "Масло")
-            Category.NOT_URGENT -> listOf("Разобрать шкаф", "Прочитать книгу")
-        }
-        withContext(Dispatchers.IO) {
-            demo.forEachIndexed { index, text ->
-                val id = dao.insert(ItemEntity(category = currentCategory.dbKey, text = text, position = index))
-                items.add(ItemEntity(id = id, category = currentCategory.dbKey, text = text, position = index))
             }
         }
     }
 
-    private companion object {
-        const val SEEDED_KEY_PREFIX = "seeded_"
-    }
-
-    private fun addItem(text: String) {
+    private fun observeState() {
         lifecycleScope.launch {
-            val position = items.size
-            val entity = ItemEntity(category = currentCategory.dbKey, text = text, position = position)
-            val id = withContext(Dispatchers.IO) { dao.insert(entity) }
-            items.add(entity.copy(id = id))
-            itemsAdapter.notifyDataSetChanged()
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collectLatest { state -> render(state) }
+            }
         }
     }
 
-    private fun deleteItem(position: Int) {
-        val entity = items[position]
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { dao.delete(entity) }
-            items.removeAt(position)
-            itemsAdapter.notifyDataSetChanged()
+    private fun render(state: MainUiState) {
+        val selected = state.categories.firstOrNull { it.id == viewModel.currentCategoryId.value }
+        if (selected == null && state.categories.isNotEmpty()) {
+            viewModel.selectCategory(state.categories.first().id)
+            return
+        }
+
+        binding.titleText.text = selected?.name.orEmpty()
+        renderCategoryChips(state)
+        renderSearch(state)
+
+        adapter.setShowCategoryNames(state.isSearching)
+        adapter.setCategoryNames(state.categories.associate { it.id to it.name })
+        adapter.setDraggingState(isDragging)
+        adapter.submit(state.visibleItems, pendingOrder)
+
+        renderEmptyState(state, selected)
+        renderTotal(state, selected)
+    }
+
+    private fun renderCategoryChips(state: MainUiState) {
+        val ids = state.categories.map { it.id }
+        if (ids != chipIds.keys.toList()) {
+            chipIds = ids.associateWith { chipIdSource.incrementAndGet() }
+            binding.categoriesGroup.removeAllViews()
+            state.categories.forEach { category ->
+                val chip = Chip(this).apply {
+                    id = chipIds.getValue(category.id)
+                    isCheckable = true
+                    setOnClickListener { viewModel.selectCategory(category.id) }
+                }
+                binding.categoriesGroup.addView(chip)
+            }
+        }
+        state.categories.forEach { category ->
+            val chip = binding.categoriesGroup.findViewById<Chip>(chipIds.getValue(category.id)) ?: return@forEach
+            chip.text = getString(R.string.category_counter, category.name, category.activeCount)
+            chip.isChecked = category.id == viewModel.currentCategoryId.value
         }
     }
 
-    private fun editItem(position: Int, newText: String) {
-        val entity = items[position].copy(text = newText)
-        items[position] = entity
-        itemsAdapter.notifyDataSetChanged()
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { dao.update(entity) }
-        }
+    private fun renderSearch(state: MainUiState) {
+        binding.searchBar.isVisible = state.searchActive
+        if (!state.searchActive) return
+        binding.searchInput.setHint(
+            if (state.searchScopeAllCategories) R.string.search_scope_all else R.string.search_scope_current
+        )
     }
 
-    /** Переносит дело между "Задачи" и "Не срочные" в обе стороны. */
-    private fun moveItem(position: Int) {
-        val entity = items[position]
-        val targetCategory = if (currentCategory == Category.TASKS) Category.NOT_URGENT else Category.TASKS
-        lifecycleScope.launch {
-            val targetCount = withContext(Dispatchers.IO) { dao.countByCategory(targetCategory.dbKey) }
-            val moved = entity.copy(category = targetCategory.dbKey, position = targetCount)
-            withContext(Dispatchers.IO) { dao.update(moved) }
-            items.removeAt(position)
-            itemsAdapter.notifyDataSetChanged()
-        }
-    }
+    private fun renderEmptyState(state: MainUiState, selected: CategoryWithCount?) {
+        val empty = state.visibleItems.isEmpty()
+        binding.emptyState.isVisible = empty
+        binding.itemsList.isVisible = !empty
+        if (!empty) return
 
-    // ----- Drag & drop -----
-
-    private fun startDrag(position: Int) {
-        isDragging = true
-        startPosition = position
-        currentPosition = position
-        itemsAdapter.notifyDataSetChanged()
-    }
-
-    private fun updateDragPosition(rawY: Int) {
-        val position = getPositionFromCoordinates(rawY)
-        if (position in items.indices && position != currentPosition) {
-            Collections.swap(items, currentPosition, position)
-            currentPosition = position
-            itemsAdapter.notifyDataSetChanged()
-        }
-    }
-
-    private fun getPositionFromCoordinates(rawY: Int): Int {
-        val location = IntArray(2)
-        binding.itemsListView.getLocationOnScreen(location)
-        val relativeY = rawY - location[1]
-        val itemHeight = binding.itemsListView.getChildAt(0)?.height ?: 100
-        return (relativeY / itemHeight).coerceIn(0, items.size - 1)
-    }
-
-    private fun endDrag() {
-        if (isDragging && startPosition != currentPosition) {
-            persistOrder()
-        }
-        isDragging = false
-        startPosition = -1
-        currentPosition = -1
-        itemsAdapter.notifyDataSetChanged()
-    }
-
-    private fun persistOrder() {
-        val updated = items.mapIndexed { index, entity -> entity.copy(position = index) }
-        items.clear()
-        items.addAll(updated)
-        lifecycleScope.launch {
-            withContext(Dispatchers.IO) { dao.updateAll(updated) }
-        }
-    }
-
-    // ----- ItemsAdapter.Callbacks -----
-
-    override fun isEditHidden(): Boolean = currentCategory == Category.SHOPPING
-
-    override fun isMoveVisible(): Boolean =
-        currentCategory == Category.TASKS || currentCategory == Category.NOT_URGENT
-
-    override fun isDragging(): Boolean = isDragging
-
-    override fun draggedPosition(): Int = currentPosition
-
-    override fun onDragHandleDown(position: Int) = startDrag(position)
-
-    override fun onEditClick(position: Int) = showEditOverlay(position)
-
-    override fun onMoveClick(position: Int) = showMoveConfirm(position)
-
-    override fun onDoneClick(position: Int) {
-        if (currentCategory == Category.SHOPPING) {
-            deleteItem(position)
+        if (state.isSearching) {
+            binding.emptyTitle.setText(R.string.empty_search)
+            binding.emptyHint.isVisible = false
         } else {
-            showDoneConfirm(position)
+            binding.emptyTitle.setText(R.string.empty_title)
+            binding.emptyHint.setText(
+                if (selected?.categoryKind == CategoryKind.SHOPPING) {
+                    R.string.empty_hint_shopping
+                } else {
+                    R.string.empty_hint_tasks
+                }
+            )
+            binding.emptyHint.isVisible = true
         }
+    }
+
+    private fun renderTotal(state: MainUiState, selected: CategoryWithCount?) {
+        val show = selected?.categoryKind == CategoryKind.SHOPPING &&
+            state.totalCents > 0 &&
+            !state.isSearching
+        binding.totalText.isVisible = show
+        if (show) {
+            val money = NumberFormat.getCurrencyInstance(Locale.getDefault()).format(state.totalCents / 100.0)
+            binding.totalText.text = getString(R.string.total_label, money)
+        }
+    }
+
+    // --- Меню ---
+
+    private fun showMainMenu(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            menu.add(0, ID_CLEAR_COMPLETED, 0, R.string.action_clear_completed)
+            menu.add(0, ID_CLEAR_CATEGORY, 1, R.string.action_clear_category)
+            menu.add(0, ID_SEARCH_ALL, 2, if (viewModel.uiState.value.searchScopeAllCategories) {
+                R.string.search_scope_current
+            } else {
+                R.string.search_scope_all
+            })
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    ID_CLEAR_COMPLETED -> { confirmClearCompleted(); true }
+                    ID_CLEAR_CATEGORY -> { confirmClearCategory(); true }
+                    ID_SEARCH_ALL -> {
+                        viewModel.setSearchScopeAllCategories(!viewModel.uiState.value.searchScopeAllCategories)
+                        viewModel.setSearchActive(true)
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    private fun showSortMenu(anchor: View) {
+        val current = viewModel.uiState.value.sortMode
+        PopupMenu(this, anchor).apply {
+            SortMode.entries.forEachIndexed { index, mode ->
+                val label = when (mode) {
+                    SortMode.MANUAL -> R.string.sort_manual
+                    SortMode.PRIORITY -> R.string.sort_priority
+                    SortMode.DATE -> R.string.sort_date
+                    SortMode.NAME -> R.string.sort_name
+                }
+                menu.add(0, index, index, label).apply { isCheckable = true }.isChecked = mode == current
+            }
+            setOnMenuItemClickListener { item ->
+                viewModel.setSortMode(SortMode.entries[item.itemId])
+                true
+            }
+            show()
+        }
+    }
+
+    private fun showCategoriesMenu(anchor: View) {
+        PopupMenu(this, anchor).apply {
+            menu.add(0, ID_ADD_CATEGORY, 0, R.string.action_categories)
+            menu.add(0, ID_RENAME_CATEGORY, 1, R.string.action_rename_category)
+            menu.add(0, ID_DELETE_CATEGORY, 2, R.string.action_delete_category)
+            setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    ID_ADD_CATEGORY -> { promptCategoryName(); true }
+                    ID_RENAME_CATEGORY -> {
+                        promptCategoryName(viewModel.currentCategoryId.value)
+                        true
+                    }
+
+                    ID_DELETE_CATEGORY -> {
+                        confirmDeleteCategory(viewModel.currentCategoryId.value)
+                        true
+                    }
+
+                    else -> false
+                }
+            }
+            show()
+        }
+    }
+
+    // --- Подтверждения ---
+
+    private fun confirmClearCategory() {
+        val state = viewModel.uiState.value
+        val category = state.categories.firstOrNull { it.id == viewModel.currentCategoryId.value } ?: return
+        val count = state.items.size
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.confirm_clear_title, category.name))
+            .setMessage(getString(R.string.confirm_clear_message, count))
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_clear_category) { _, _ ->
+                viewModel.clearCategory { removed ->
+                    showUndoSnackbar(R.string.snackbar_category_cleared, removed)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmClearCompleted() {
+        val doneCount = adapter.currentList.count { it.done }
+        if (doneCount == 0) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.confirm_clear_completed_title)
+            .setMessage(getString(R.string.confirm_clear_completed_message, doneCount))
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_clear_completed) { _, _ ->
+                viewModel.clearCompleted { removed ->
+                    showUndoSnackbar(R.string.snackbar_completed_cleared, removed)
+                }
+            }
+            .show()
+    }
+
+    private fun confirmDeleteCategory(id: Long) {
+        val category = viewModel.uiState.value.categories.firstOrNull { it.id == id } ?: return
+        if (category.isBuiltIn) {
+            showSnackbar(getString(R.string.confirm_builtin_category))
+            return
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.confirm_delete_category_title, category.name))
+            .setMessage(R.string.confirm_delete_category_message)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_delete) { _, _ ->
+                viewModel.deleteCategory(id)
+                showSnackbar(getString(R.string.snackbar_category_deleted, category.name))
+            }
+            .show()
+    }
+
+    private fun promptCategoryName(editId: Long = 0L) {
+        val state = viewModel.uiState.value
+        val existing = state.categories.firstOrNull { it.id == editId }
+        val input = TextInputEditText(this).apply {
+            setHint(R.string.action_categories)
+            existing?.let { setText(it.name) }
+            setSelection(text?.length ?: 0)
+        }
+        val padding = 24.dp
+        val container = TextInputLayout(this).apply {
+            setPadding(padding, padding / 2, padding, 0)
+            addView(input)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (editId > 0) R.string.action_rename_category else R.string.action_categories)
+            .setView(container)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val name = input.text?.toString()?.trim().orEmpty()
+                if (name.isEmpty()) return@setPositiveButton
+                val taken = state.categories.any {
+                    it.name.equals(name, ignoreCase = true) && it.id != editId
+                }
+                if (taken) {
+                    showSnackbar(getString(R.string.dialog_error_name_taken))
+                    return@setPositiveButton
+                }
+                if (editId > 0) viewModel.renameCategory(editId, name) else viewModel.addCategory(name, CategoryKind.TASKS)
+            }
+            .show()
+    }
+
+    // --- Элемент ---
+
+    private fun openItemEditor(item: ItemEntity?) {
+        ItemEditDialog.newInstance(currentKind(), item).show(supportFragmentManager, TAG_ITEM_EDITOR)
+    }
+
+    private fun consumeQuickAdd(intent: Intent?) {
+        val text = intent?.getStringExtra(EXTRA_QUICK_ADD_TEXT) ?: return
+        intent.removeExtra(EXTRA_QUICK_ADD_TEXT)
+        viewModel.addItem(text.trim()) { created ->
+            if (created != null) showSnackbar(getString(R.string.snackbar_item_added, created.text))
+        }
+    }
+
+    private fun currentKind(): CategoryKind =
+        viewModel.uiState.value.categories.firstOrNull { it.id == viewModel.currentCategoryId.value }
+            ?.categoryKind ?: CategoryKind.TASKS
+
+    // --- Snackbar ---
+
+    private fun showSnackbar(text: String) {
+        Snackbar.make(binding.root, text, Snackbar.LENGTH_SHORT).show()
+    }
+
+    private fun showUndoSnackbar(messageRes: Int, removed: List<ItemEntity>) {
+        if (removed.isEmpty()) {
+            showSnackbar(getString(messageRes))
+            return
+        }
+        Snackbar.make(binding.root, messageRes, Snackbar.LENGTH_LONG)
+            .setAction(R.string.snackbar_undo) { viewModel.restoreItems(removed) }
+            .show()
+    }
+
+    // --- ItemsAdapter.Callbacks ---
+
+    override fun onEditClick(position: Int) {
+        adapter.itemAt(position)?.let { openItemEditor(it) }
+    }
+
+    override fun onDoneChanged(item: ItemEntity, done: Boolean) {
+        viewModel.setDone(item.id, done)
+    }
+
+    override fun onMoveClick(position: Int) {
+        val item = adapter.itemAt(position) ?: return
+        val state = viewModel.uiState.value
+        val target = state.categories.firstOrNull {
+            it.id != item.categoryId && it.categoryKind == CategoryKind.TASKS
+        } ?: return
+        viewModel.moveToCategory(item.id, target.id)
+        showSnackbar(getString(R.string.snackbar_item_moved, target.name))
+    }
+
+    override fun onDeleteClick(position: Int) {
+        val item = adapter.itemAt(position) ?: return
+        viewModel.deleteItem(item)
+        showUndoSnackbar(R.string.snackbar_item_deleted, listOf(item))
+    }
+
+    override fun onDragHandleDown(holder: RecyclerView.ViewHolder) {
+        touchHelper.startDrag(holder)
+    }
+
+    // --- Перетаскивание ---
+
+    private inner class DragCallback : ItemTouchHelper.Callback() {
+
+        override fun isLongPressDragEnabled() = false
+        override fun isItemViewSwipeEnabled() = false
+
+        override fun getMovementFlags(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder
+        ): Int = makeMovementFlags(ItemTouchHelper.UP or ItemTouchHelper.DOWN, 0)
+
+        override fun onMove(
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            target: RecyclerView.ViewHolder
+        ): Boolean {
+            val from = viewHolder.bindingAdapterPosition
+            val to = target.bindingAdapterPosition
+            if (from == RecyclerView.NO_POSITION || to == RecyclerView.NO_POSITION) return false
+            adapter.move(from, to)
+            pendingOrder = adapter.currentList
+            return true
+        }
+
+        override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) = Unit
+
+        override fun onSelectedChanged(viewHolder: RecyclerView.ViewHolder?, actionState: Int) {
+            super.onSelectedChanged(viewHolder, actionState)
+            when (actionState) {
+                ItemTouchHelper.ACTION_STATE_DRAG -> {
+                    isDragging = true
+                    adapter.setDraggingState(true)
+                    viewHolder?.itemView?.apply {
+                        alpha = 0.75f
+                        elevation = 12f
+                        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    }
+                }
+
+                ItemTouchHelper.ACTION_STATE_IDLE -> if (isDragging) {
+                    isDragging = false
+                    adapter.setDraggingState(false)
+                    viewHolder?.itemView?.apply { alpha = 1f; elevation = 2f }
+                    pendingOrder?.let { viewModel.persistOrder(it) }
+                    pendingOrder = null
+                }
+            }
+        }
+
+        override fun onChildDraw(
+            c: Canvas,
+            recyclerView: RecyclerView,
+            viewHolder: RecyclerView.ViewHolder,
+            dX: Float,
+            dY: Float,
+            actionState: Int,
+            isCurrentlyActive: Boolean
+        ) {
+            // Список сам не прокрутится, если тянуть элемент к его краю.
+            autoScrollNearEdges(recyclerView, viewHolder)
+            super.onChildDraw(c, recyclerView, viewHolder, dX, dY, actionState, isCurrentlyActive)
+        }
+
+        override fun clearView(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+            super.clearView(recyclerView, viewHolder)
+            viewHolder.itemView.alpha = 1f
+            viewHolder.itemView.elevation = 2f
+        }
+    }
+
+    private fun autoScrollNearEdges(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder) {
+        val child = viewHolder.itemView ?: return
+        val location = IntArray(2)
+        child.getLocationOnScreen(location)
+        val edge = 72.dp
+        val screenHeight = resources.displayMetrics.heightPixels
+        when {
+            location[1] < edge -> recyclerView.scrollBy(0, -12)
+            location[1] + child.height > screenHeight - edge -> recyclerView.scrollBy(0, 12)
+        }
+    }
+
+    private val Int.dp: Int get() = (this * resources.displayMetrics.density).toInt()
+
+    companion object {
+        const val EXTRA_QUICK_ADD_TEXT = "quick_add_text"
+        private const val TAG_ITEM_EDITOR = "itemEditor"
+        private const val STATE_CATEGORY = "selected_category"
+        private const val ID_CLEAR_CATEGORY = 1
+        private const val ID_CLEAR_COMPLETED = 2
+        private const val ID_SEARCH_ALL = 3
+        private const val ID_ADD_CATEGORY = 10
+        private const val ID_RENAME_CATEGORY = 11
+        private const val ID_DELETE_CATEGORY = 12
     }
 }
