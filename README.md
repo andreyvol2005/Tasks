@@ -13,6 +13,21 @@
 
 Один экран, произвольное число списков, локальная база без интернета.
 
+## Скриншоты
+
+<table>
+  <tr>
+    <td align="center"><b>Список задач</b></td>
+    <td align="center"><b>Не срочные дела</b></td>
+    <td align="center"><b>Список покупок</b></td>
+  </tr>
+  <tr>
+    <td><img width="250" alt="Список задач" src="screenshots/1-tasks.png"></td>
+    <td><img width="250" alt="Не срочные дела" src="screenshots/2-not-urgent.png"></td>
+    <td><img width="250" alt="Список покупок" src="screenshots/3-shopping.png"></td>
+  </tr>
+</table>
+
 ## Списки
 
 - Любое количество своих списков поверх трёх встроенных
