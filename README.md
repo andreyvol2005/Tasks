@@ -1,19 +1,6 @@
-# Tasks & Shopping List - Android App
-
 <div align="center">
 
-![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
-![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
-![AGP](https://img.shields.io/badge/AGP-9.3.1-3DDC84?style=for-the-badge)
-![Room](https://img.shields.io/badge/Room-2.8.5-4285F4?style=for-the-badge)
-
-**Мобильное приложение для управления задачами и списком покупок**
-
-</div>
-
-Один экран, произвольное число списков, локальная база без интернета.
-
-## Скриншоты
+# Tasks & Shopping List - Android App
 
 <table>
   <tr>
@@ -27,6 +14,17 @@
     <td><img width="250" alt="Список покупок" src="screenshots/3-shopping.png"></td>
   </tr>
 </table>
+
+![Android](https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&logo=android&logoColor=white)
+![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?style=for-the-badge&logo=kotlin&logoColor=white)
+![AGP](https://img.shields.io/badge/AGP-9.3.1-3DDC84?style=for-the-badge)
+![Room](https://img.shields.io/badge/Room-2.8.5-4285F4?style=for-the-badge)
+
+</div>
+
+**Мобильное приложение для управления задачами и списком покупок**
+
+Один экран, произвольное число списков, локальная база без интернета.
 
 ## Списки
 
